@@ -70,24 +70,14 @@ const observer = new MutationObserver(mutations => {
   }
 });
 
-function findChatContainer() {
-  return (
-    document.querySelector("[data-testid='conversation-panel-messages']") ||
-    document.querySelector("div[aria-label='Message list']") ||
-    document.querySelector('#main')
-  );
-}
-
-function init() {
-  const chat = findChatContainer();
-  if (chat) {
-    observer.observe(chat, { childList: true, subtree: true });
-    console.log('[AutoResponder] Observer attached to chat container');
-  } else {
-    console.warn('[AutoResponder] Chat container not found, retrying...');
-    setTimeout(init, 1000);
-  }
+function attachObserver() {
+  observer.observe(document.body, { childList: true, subtree: true });
+  console.log('[AutoResponder] Observer attached to document body');
 }
 
 loadConfig();
-init();
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', attachObserver);
+} else {
+  attachObserver();
+}
