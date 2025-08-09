@@ -6,13 +6,16 @@ document.addEventListener('DOMContentLoaded', () => {
   chrome.storage.local.get(['keyword', 'response'], data => {
     if (data.keyword) keywordInput.value = data.keyword;
     if (data.response) responseInput.value = data.response;
+    console.log('[AutoResponder Popup] Loaded config', data);
   });
 
   document.getElementById('save').addEventListener('click', () => {
-    chrome.storage.local.set({
+    const toSave = {
       keyword: keywordInput.value.trim(),
       response: responseInput.value.trim()
-    }, () => {
+    };
+    console.log('[AutoResponder Popup] Saving config', toSave);
+    chrome.storage.local.set(toSave, () => {
       statusEl.textContent = 'Guardado';
       setTimeout(() => { statusEl.textContent = ''; }, 1500);
     });
