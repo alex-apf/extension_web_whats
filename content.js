@@ -70,11 +70,19 @@ const observer = new MutationObserver(mutations => {
   }
 });
 
+function findChatContainer() {
+  return (
+    document.querySelector("[data-testid='conversation-panel-messages']") ||
+    document.querySelector("div[aria-label='Message list']") ||
+    document.querySelector('#main')
+  );
+}
+
 function init() {
-  const chat = document.querySelector('#main');
+  const chat = findChatContainer();
   if (chat) {
     observer.observe(chat, { childList: true, subtree: true });
-    console.log('[AutoResponder] Observer attached');
+    console.log('[AutoResponder] Observer attached to chat container');
   } else {
     console.warn('[AutoResponder] Chat container not found, retrying...');
     setTimeout(init, 1000);
