@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "WhatsApp Web Autoresponder",
+  "version": "1.2.0",
+  "action": { "default_popup": "options.html", "default_title": "Autoresponder" },
+  "permissions": ["storage"],
+  "host_permissions": ["https://web.whatsapp.com/*"],
+  "background": { "service_worker": "background.js" },
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": ["https://web.whatsapp.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_end"
+    }
+  ]
+}
