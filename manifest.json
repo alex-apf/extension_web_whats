@@ -2,8 +2,13 @@
   "manifest_version": 3,
   "name": "Simple WhatsApp Auto Responder",
   "version": "1.0.0",
-  "description": "Responde automáticamente con un texto fijo a los mensajes entrantes.",
+  "description": "Responde automáticamente a mensajes que contienen una palabra clave.",
+  "permissions": ["storage"],
   "host_permissions": ["https://web.whatsapp.com/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Auto Responder"
+  },
   "content_scripts": [
     {
       "matches": ["https://web.whatsapp.com/*"],

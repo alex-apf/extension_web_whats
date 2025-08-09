@@ -1,8 +1,21 @@
 const processed = new WeakSet();
+let config = { keyword: '', response: '' };
+
+function loadConfig() {
+  chrome.storage.local.get(['keyword', 'response'], data => {
+    config.keyword = data.keyword || '';
+    config.response = data.response || '';
+  });
+}
+
+chrome.storage.onChanged.addListener(changes => {
+  if (changes.keyword) config.keyword = changes.keyword.newValue || '';
+  if (changes.response) config.response = changes.response.newValue || '';
+});
 
 function getMessageText(msgElem) {
-  const span = msgElem.querySelector("span.selectable-text.copyable-text > span");
-  return span ? span.innerText.trim() : "";
+  const span = msgElem.querySelector('span.selectable-text.copyable-text > span');
+  return span ? span.innerText.trim() : '';
 }
 
 function sendAutoReply(text) {
@@ -23,8 +36,13 @@ const observer = new MutationObserver(mutations => {
       if (!msg || processed.has(msg)) continue;
       processed.add(msg);
       const text = getMessageText(msg);
-      if (text) {
-        sendAutoReply('Hola, esta es una respuesta automática.');
+      if (
+        text &&
+        config.keyword &&
+        config.response &&
+        text.toLowerCase().includes(config.keyword.toLowerCase())
+      ) {
+        sendAutoReply(config.response);
       }
     }
   }
@@ -39,4 +57,5 @@ function init() {
   }
 }
 
+loadConfig();
 init();

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: sans-serif; margin: 10px; }
+    label { display: block; margin-top: 8px; }
+    input, textarea { width: 100%; box-sizing: border-box; }
+    button { margin-top: 10px; }
+    #status { margin-top: 8px; color: green; }
+  </style>
+</head>
+<body>
+  <label>
+    Palabra clave:
+    <input id="keyword" type="text" />
+  </label>
+  <label>
+    Respuesta:
+    <textarea id="response" rows="4"></textarea>
+  </label>
+  <button id="save">Guardar</button>
+  <div id="status"></div>
+  <script src="popup.js"></script>
+</body>
+</html>
