@@ -1,6 +1,0 @@
-body { font-family: system-ui, sans-serif; margin: 16px; }
-form#new { display: grid; gap: 8px; max-width: 700px; }
-textarea { min-height: 80px; }
-ul#list { list-style: none; padding: 0; }
-ul#list li { margin: 6px 0; }
-button { cursor: pointer; margin-left:6px; }
