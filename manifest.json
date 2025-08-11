@@ -1,17 +1,18 @@
 {
   "manifest_version": 3,
-  "name": "WhatsApp Web Autoresponder",
-  "version": "1.2.0",
-  "action": { "default_popup": "options.html", "default_title": "Autoresponder" },
+  "name": "Simple WhatsApp Auto Responder",
+  "version": "1.0.0",
+  "description": "Responde automáticamente a mensajes que contienen una palabra clave.",
   "permissions": ["storage"],
   "host_permissions": ["https://web.whatsapp.com/*"],
-  "background": { "service_worker": "background.js" },
-  "options_page": "options.html",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Auto Responder"
+  },
   "content_scripts": [
     {
       "matches": ["https://web.whatsapp.com/*"],
       "js": ["content.js"],
-      "css": ["content.css"],
       "run_at": "document_end"
     }
   ]
