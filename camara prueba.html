@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Dibujo en el aire con la mano</title>
+<style>
+  :root { color-scheme: dark; }
+  body{margin:0;background:#0b0b0f;color:#eaeaea;font:14px/1.4 system-ui,Segoe UI,Roboto,Helvetica,Arial}
+  header,footer{display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;padding:.75rem 1rem;background:#12121a;position:sticky;top:0;z-index:5;border-bottom:1px solid #222}
+  .pill{background:#1a1a25;border:1px solid #2a2a38;border-radius:999px;padding:.35rem .75rem}
+  label{display:flex;align-items:center;gap:.4rem}
+  #stage{position:relative;display:grid;place-items:center;height:calc(100dvh - 120px);}
+  video,canvas{position:absolute;inset:0;margin:auto;max-width:100%;max-height:100%}
+  #video{transform:scaleX(-1);filter:brightness(1.05)} /* video siempre espejado */
+  #paint{pointer-events:none}
+  #hud{position:absolute;left:10px;bottom:10px;background:#101018cc;border:1px solid #27273a;border-radius:12px;padding:.5rem .75rem}
+  button,select,input[type=color]{background:#1b1b27;border:1px solid #2c2c3c;color:#eee;border-radius:10px;padding:.45rem .6rem}
+  button:hover{filter:brightness(1.1)}
+  .danger{border-color:#7b2230;background:#2a1418}
+</style>
+</head>
+<body>
+<header>
+  <span class="pill">Pinza pulgar–índice = dibujar</span>
+  <label class="pill">Cámara:
+    <select id="cameraSelect"></select>
+  </label>
+  <label class="pill">Color:
+    <input id="color" type="color" value="#ff2d55" />
+  </label>
+  <label class="pill">Grosor:
+    <input id="size" type="range" min="1" max="24" value="6" />
+  </label>
+  <label class="pill">Espejo:
+    <input id="mirrorToggle" type="checkbox" checked />
+  </label>
+  <button id="eraser">Borrador</button>
+  <button id="clear" class="danger">Limpiar</button>
+  <span id="status" class="pill">Estado: <span id="sText">inicializando…</span></span>
+</header>
+
+<main id="stage">
+  <video id="video" autoplay playsinline muted></video>
+  <canvas id="view"></canvas>
+  <canvas id="paint"></canvas>
+  <div id="hud"><span>✋ Mano: <span id="handState">buscando…</span></span></div>
+</main>
+
+<footer>
+  <small>Usa HTTPS o localhost para permisos de cámara.</small>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script>
+(async () => {
+  const video = document.getElementById('video');
+  const view = document.getElementById('view');
+  const paint = document.getElementById('paint');
+  const statusEl = document.getElementById('sText');
+  const handStateEl = document.getElementById('handState');
+  const cameraSelect = document.getElementById('cameraSelect');
+  const colorEl = document.getElementById('color');
+  const sizeEl = document.getElementById('size');
+  const eraserBtn = document.getElementById('eraser');
+  const clearBtn = document.getElementById('clear');
+  const mirrorToggle = document.getElementById('mirrorToggle');
+
+  let camera, currentStream;
+  let drawing = false;
+  let lastPt = null;
+  let isEraser = false;
+  let mirror = true;
+
+  function fitCanvases() {
+    const w = video.videoWidth || view.clientWidth;
+    const h = video.videoHeight || view.clientHeight;
+    if (!w || !h) return;
+    [view, paint].forEach(c => { c.width = w; c.height = h; });
+  }
+  function setStatus(msg){ statusEl.textContent = msg; }
+  function setHandState(msg){ handStateEl.textContent = msg; }
+
+  async function listCameras() {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const vids = devices.filter(d => d.kind === 'videoinput');
+    cameraSelect.innerHTML = "";
+    vids.forEach((d,i)=>{
+      const opt=document.createElement('option');
+      opt.value=d.deviceId; opt.textContent=d.label||`Cámara ${i+1}`;
+      cameraSelect.appendChild(opt);
+    });
+    if (!vids.length) throw new Error("No hay cámaras disponibles");
+  }
+
+  async function openCamera(deviceId) {
+    if (camera) { camera.stop(); camera = null; }
+    if (currentStream) { currentStream.getTracks().forEach(t=>t.stop()); currentStream=null; }
+    const constraints = {
+      video: {
+        deviceId: deviceId ? { exact: deviceId } : undefined,
+        width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user"
+      }, audio:false
+    };
+    currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+    video.srcObject = currentStream;
+    await video.play();
+    fitCanvases();
+    camera = new Camera(video, {
+      onFrame: async () => { await hands.send({ image: video }); },
+      width: video.videoWidth || 1280,
+      height: video.videoHeight || 720,
+    });
+    camera.start();
+  }
+
+  const hands = new Hands({
+    locateFile: (f)=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`,
+  });
+  hands.setOptions({
+    selfieMode: true,
+    maxNumHands: 1,
+    modelComplexity: 1,
+    minDetectionConfidence: 0.6,
+    minTrackingConfidence: 0.6,
+  });
+
+  const vctx = view.getContext('2d');
+  const pctx = paint.getContext('2d');
+  pctx.lineCap='round'; pctx.lineJoin='round';
+
+  function dist(a,b){ const dx=a.x-b.x, dy=a.y-b.y; return Math.hypot(dx,dy); }
+  function lm2px(lm){ return { x: lm.x*view.width, y: lm.y*view.height }; }
+
+  hands.onResults((res)=>{
+    // fondo de video espejado
+    vctx.save();
+    vctx.clearRect(0,0,view.width,view.height);
+    vctx.scale(-1,1);
+    vctx.drawImage(res.image, -view.width, 0, view.width, view.height);
+    vctx.restore();
+
+    if (!res.multiHandLandmarks || !res.multiHandLandmarks.length){
+      setHandState("buscando…"); drawing=false; lastPt=null; return;
+    }
+
+    const lm = res.multiHandLandmarks[0];
+    const thumbTip = lm[4];
+    const indexTip = lm[8];
+
+    const pinch = dist(thumbTip, indexTip) < 0.05;
+
+    let pt = lm2px(indexTip);
+    if (mirror) pt.x = view.width - pt.x; // reflejo del trazo
+
+    setHandState(pinch ? "pinza (dibujo)" : "mano abierta");
+
+    if (pinch){
+      if (!drawing){ drawing=true; lastPt=pt; }
+      else{
+        pctx.strokeStyle = isEraser ? "#0b0b0f" : colorEl.value;
+        pctx.lineWidth = parseInt(sizeEl.value,10);
+        pctx.globalCompositeOperation = isEraser ? "destination-out" : "source-over";
+        pctx.beginPath(); pctx.moveTo(lastPt.x,lastPt.y); pctx.lineTo(pt.x,pt.y); pctx.stroke();
+        lastPt = pt;
+      }
+    } else { drawing=false; lastPt=null; }
+
+    // guía
+    vctx.fillStyle = pinch ? "#7CFC00" : "#999";
+    const dot=6; vctx.beginPath(); vctx.arc(pt.x, pt.y, dot, 0, Math.PI*2); vctx.fill();
+  });
+
+  // UI
+  eraserBtn.addEventListener('click', ()=>{
+    isEraser = !isEraser;
+    eraserBtn.textContent = isEraser ? "Borrador: ON" : "Borrador";
+  });
+  clearBtn.addEventListener('click', ()=>{ pctx.clearRect(0,0,paint.width,paint.height); });
+  cameraSelect.addEventListener('change', async ()=>{
+    try{ setStatus("cambiando cámara…"); await openCamera(cameraSelect.value); setStatus("ok"); }
+    catch(e){ setStatus("error al cambiar cámara"); console.error(e); alert("Error al cambiar de cámara: "+e.message); }
+  });
+  mirrorToggle.addEventListener('change', ()=>{ mirror = mirrorToggle.checked; });
+
+  // init
+  try{
+    await navigator.mediaDevices.getUserMedia({ video:true, audio:false }); // dispara el prompt
+    await listCameras();
+    await openCamera(cameraSelect.value);
+    setStatus("ok");
+  }catch(err){
+    console.error(err);
+    setStatus("permiso denegado o sin cámara");
+    alert("No pude acceder a la cámara. Usa HTTPS o permite el acceso en el navegador.");
+  }
+
+  video.addEventListener('loadedmetadata', fitCanvases);
+  window.addEventListener('resize', fitCanvases);
+})();
+</script>
+</body>
+</html>
